@@ -12,7 +12,7 @@ The scope is always the whole stage. One criterion is active at a time.
 
 Model names are never inferred from prim names. An unavailable mode explains which data is missing. File means the USD source layer, which may differ from an original RVT or IFC filename.
 
-Property keys retain their full namespaces. The panel shortens the HOOPS prefix for display. Values retain their Python scalar type, so the string `"1"` and the integer `1` form different groups.
+Property keys retain their full namespaces. The panel labels HOOPS properties with `[HOOPS]` and retains their category paths. Values retain their Python scalar type, so the string `"1"` and the integer `1` form different groups.
 
 A logical object owns the geometry below a metadata-bearing prim, ending at the next metadata-bearing object. Untagged geometry becomes its own object when no owner exists. Spatial IFC containers do not become objects. Native instances count once, regardless of their mesh count. Visible internal reference sources are excluded with a notice to avoid recoloring their instances indirectly.
 

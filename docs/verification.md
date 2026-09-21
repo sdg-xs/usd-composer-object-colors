@@ -4,13 +4,13 @@ Verified on 2026-09-21 using Kit `110.2.0+feature.342835.698af100.gl`, OpenUSD 2
 
 ## Automated checks
 
-`run-verify.ps1` runs focused unittest cases against the installed USD libraries. The cases cover typed grouping, missing values, overflow, stable assignments, template independence, import validation, scene persistence, logical-object counting, instance bindings, opacity, subsets, collection priorities, and restoration.
+`run-verify.ps1` runs 14 focused unittest cases against the installed USD libraries. The cases cover typed grouping, missing values, overflow, stable assignments, template independence, import validation, scene persistence, logical-object counting, property source labels, reserved-looking user names, instance bindings, opacity, subsets, collection priorities, and restoration.
 
 `run-typecheck.ps1` runs mypy with `check_untyped_defs` on the extension. Kit and USD APIs do not ship complete type stubs, so the runtime checks remain necessary.
 
-`run-verify-kit.ps1` starts an isolated Kit app with the actual extension. It renders a generated scene, changes one native instance, and measures red pixels before coloring, during coloring, and after Disable. The last completed rendering check measured 0, 194,512, and 0 red pixels respectively.
+`run-verify-kit.ps1` starts an isolated Kit app with the actual extension. It renders a generated scene, changes one native instance, and measures red pixels before coloring, during coloring, and after Disable. Recorded checks measured zero red pixels before and after, and more than 194,000 during coloring.
 
-The Kit workflow also checks swatch edits, No color, undo, redo, File grouping, unavailable Model metadata, incompatible templates, enabled and disabled save/reopen, stage replacement, and shutdown. It checks that the old visualization layer is released and that shutdown leaves no active overrides.
+The Kit workflow also checks rendered swatch edits and No color, undo, redo, stale palette rejection, File grouping, unavailable Model metadata, incompatible templates, enabled and disabled save/reopen, stage replacement, and shutdown. It checks that the old visualization layer is released and that shutdown leaves no active overrides.
 
 ## Performance
 

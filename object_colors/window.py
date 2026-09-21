@@ -45,6 +45,8 @@ class ObjectColorsWindow:
 
     def update(self, rebuild=True):
         if rebuild:
+            if self.palette_window:
+                self.palette_window.visible = False
             self.window.frame.rebuild()
         elif hasattr(self, 'status_label'):
             self.status_label.text = self.controller.status
@@ -74,7 +76,9 @@ class ObjectColorsWindow:
                 if reason:
                     ui.Label(reason, word_wrap=True, height=34, style={'color': 0xFF88BBFF})
                 if controller.scheme.mode == 'Property':
-                    ui.StringField(self.search, height=24, tooltip='Filter property names and categories')
+                    with ui.HStack(height=24):
+                        ui.Label('Find property', width=90)
+                        ui.StringField(self.search, tooltip='Filter property names and categories')
                     self.property_frame = ui.Frame(height=26)
                     self.property_frame.set_build_fn(self._build_properties)
                 with ui.CollapsableFrame('Shared templates', height=0, collapsed=False):
@@ -88,7 +92,9 @@ class ObjectColorsWindow:
                         with ui.HStack(height=24):
                             ui.Label('Preset name', width=85)
                             ui.StringField(self.name)
-                        ui.StringField(self.file_path, height=24, tooltip='Full path to a JSON preset file')
+                        with ui.HStack(height=24):
+                            ui.Label('JSON path', width=85)
+                            ui.StringField(self.file_path, tooltip='Full path to a JSON preset file')
                         with ui.HStack(height=24):
                             ui.Button('Import JSON', clicked_fn=self._import)
                             ui.Button('Export new JSON', clicked_fn=self._export)
@@ -103,12 +109,13 @@ class ObjectColorsWindow:
                         with ui.HStack(height=26, spacing=6):
                             ui.Label(group.label, tooltip=group.key, elided_text=True)
                             ui.Label(str(len(group.objects)), width=56, alignment=ui.Alignment.RIGHT_CENTER)
-                            ui.Button('None' if group.color is None else '', width=52,
-                                      style={'background_color': swatch_color(group.color)},
+                            ui.Button('None' if group.color is None else 'Edit', width=52, height=24,
+                                      style={'background_color': swatch_color(group.color), 'color': 0xFF111111},
                                       tooltip='Change group color', clicked_fn=lambda g=group: self._palette(g))
             self.status_label = ui.Label(controller.status, height=36, word_wrap=True)
             if controller.issues:
-                with ui.CollapsableFrame(f'{len(controller.issues)} notices', height=0, collapsed=True):
+                notice_label = 'notice' if len(controller.issues) == 1 else 'notices'
+                with ui.CollapsableFrame(f'{len(controller.issues)} {notice_label}', height=0, collapsed=True):
                     with ui.ScrollingFrame(height=110):
                         ui.Label('\n'.join(controller.issues), word_wrap=True, alignment=ui.Alignment.LEFT_TOP)
             ui.Label('Save the scene to retain its active scheme. Export JSON to reuse it.',
@@ -129,19 +136,24 @@ class ObjectColorsWindow:
         if self.palette_window:
             self.palette_window.destroy()
         self.palette_window = ui.Window('Choose color', width=350, height=260)
+        generation = self.controller.generation
+        criterion = self.controller.scheme.criterion
         with self.palette_window.frame:
             with ui.VStack(spacing=6, margin=10):
                 ui.Label(group.label, height=24, elided_text=True)
                 for row in range(5):
                     with ui.HStack(spacing=4, height=28):
                         for color in PALETTE[row * 8:(row + 1) * 8]:
-                            ui.Button('', style={'background_color': swatch_color(color)},
-                                      clicked_fn=lambda c=color: self._choose(group.key, c))
-                ui.Button('No color', height=26, clicked_fn=lambda: self._choose(group.key, None))
+                            ui.Button('\u25a0', height=28, style={'background_color': swatch_color(color), 'color': swatch_color(color)},
+                                      clicked_fn=lambda c=color: self._choose(group.key, c, generation, criterion))
+                ui.Button('No color', height=26, clicked_fn=lambda: self._choose(group.key, None, generation, criterion))
 
-    def _choose(self, key, color):
+    def _choose(self, key, color, generation, criterion):
         if self.palette_window:
             self.palette_window.visible = False
+        if (self.controller.busy or self.controller.generation != generation
+                or self.controller.scheme.criterion != criterion):
+            return
         self.controller.edit(color=(key, color))
 
     def _template_changed(self, model, _):

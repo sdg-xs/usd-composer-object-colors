@@ -76,19 +76,36 @@ async def verify_workflow(context, sample):
         controller.edit(color=('str:"A"', '#E15759'))
         await settled(controller)
         assert controller.scheme.color('str:"A"') == '#E15759'
+        viewport = vp_util.get_active_viewport()
+        await frames(30)
+        rendered = await capture(viewport, 'controller-colored.png')
+        assert rendered > 100, ('controller did not render its selected color', rendered)
         controller.edit(color=('str:"A"', None))
         await settled(controller)
         mesh = context.get_stage().GetPrimAtPath('/World/A/Shape')
         assert str(UsdShade.MaterialBindingAPI(mesh).ComputeBoundMaterial()[0].GetPath()) == '/World/Looks/Glass'
+        await frames(30)
+        assert await capture(viewport, 'controller-no-color.png') < rendered / 2
         omni.kit.undo.undo()
         await settled(controller)
         assert controller.scheme.color('str:"A"') == '#E15759'
         omni.kit.undo.redo()
         await settled(controller)
         assert controller.scheme.color('str:"A"') is None
+        extension.panel._palette(controller.groups[0])
+        generation = controller.generation
+        criterion = controller.scheme.criterion
+        assert ui.Workspace.get_window('Choose color').visible
+        await frames(3)
+        capture_api.capture_next_frame_swapchain(str(OUTPUT / 'palette.png'), app_window)
+        await frames(3)
+        capture_api.wait_async_capture(app_window)
         controller.edit(mode='File')
         await settled(controller)
         assert len(controller.groups) == 1
+        assert not ui.Workspace.get_window('Choose color').visible
+        extension.panel._choose('str:"A"', '#E15759', generation, criterion)
+        assert 'str:"A"' not in controller.scheme.palettes.get('File:', {})
         controller.edit(mode='Model')
         await settled(controller)
         assert any('model asset metadata' in issue for issue in controller.issues)

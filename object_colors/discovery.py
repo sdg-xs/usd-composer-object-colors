@@ -78,7 +78,8 @@ def scan_steps(stage):
         if prim.IsInstance():
             refs = prim.GetMetadata('references')
             for ref in refs.GetAppliedItems() if refs else []:
-                if not ref.assetPath and ref.primPath and stage.GetPrimAtPath(ref.primPath):
+                source = stage.GetPrimAtPath(ref.primPath) if ref.primPath else None
+                if not ref.assetPath and source and not source.IsAbstract():
                     source_roots.add(ref.primPath)
     for path in source_roots:
         result.issues.append(f'{path}: instance source geometry is excluded; color the placed instances instead')
@@ -90,7 +91,7 @@ def scan_steps(stage):
         if index % 128 == 0:
             yield index
         path = str(prim.GetPath())
-        if path.startswith('/__ObjectColors') or any(prim.GetPath().HasPrefix(p) for p in source_roots):
+        if any(prim.GetPath().HasPrefix(p) for p in source_roots):
             continue
         parent = str(prim.GetParent().GetPath())
         owner = owners.get(parent)
@@ -116,4 +117,6 @@ def scan_steps(stage):
 
 
 def property_label(key: str) -> str:
-    return key.removeprefix(HOOPS).replace(':', ' / ')
+    if key.startswith(HOOPS):
+        return '[HOOPS] ' + key.removeprefix(HOOPS).replace(':', ' / ')
+    return key.replace(':', ' / ')

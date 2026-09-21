@@ -2,7 +2,7 @@ import unittest
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade
 
 from object_colors.overrides import ColorOverrides
-from object_colors.discovery import scan_stage
+from object_colors.discovery import property_label, scan_stage
 
 
 def material(stage, path, opacity=1.0):
@@ -31,6 +31,14 @@ def fixture():
 
 
 class ColoringTests(unittest.TestCase):
+    def test_user_geometry_named_like_the_extension_is_still_discovered(self):
+        stage = Usd.Stage.CreateInMemory()
+        UsdGeom.Cube.Define(stage, '/__ObjectColorsBuilding')
+        self.assertEqual([o.path for o in scan_stage(stage).objects], ['/__ObjectColorsBuilding'])
+
+    def test_hoops_property_labels_retain_source_context(self):
+        self.assertNotEqual(property_label('TYPE'), property_label('omni:hoops:metadata:TYPE'))
+
     def test_inherited_display_opacity_and_model_mapping(self):
         stage = Usd.Stage.CreateInMemory()
         root = UsdGeom.Xform.Define(stage, '/World').GetPrim()
