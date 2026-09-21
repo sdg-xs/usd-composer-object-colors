@@ -1,0 +1,7 @@
+[tool.mypy]
+python_version = "3.12"
+files = ["object_colors"]
+ignore_missing_imports = true
+check_untyped_defs = true
+cache_dir = "verification/mypy-cache"
+
