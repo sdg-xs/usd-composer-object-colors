@@ -12,12 +12,12 @@ import omni.kit.undo
 import omni.ui as ui
 import omni.kit.viewport.utility as vp_util
 import omni.usd
-from PIL import Image
-from pxr import Gf, Sdf, UsdGeom, UsdLux, UsdShade
+from PIL import Image, ImageStat
+from pxr import Gf, Sdf, Usd, UsdGeom, UsdLux, UsdShade
 
 ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT), str(ROOT / 'tests')]
-from test_usd import fixture
+from test_usd import fixture, material
 from object_colors.overrides import ColorOverrides
 from object_colors.extension import ObjectColorsExtension
 from object_colors.presets import read
@@ -68,6 +68,9 @@ async def verify_workflow(context, sample):
         await settled(controller)
         assert controller.scheme.enabled
         assert len(controller.groups) == 2
+        assert {o.path for o in controller.scan.objects} == {'/World/A', '/World/B'}
+        sky = context.get_stage().GetPrimAtPath('/Environment/Sky')
+        assert not UsdShade.MaterialBindingAPI(sky).ComputeBoundMaterial()[0]
         capture_api = omni.kit.renderer_capture.acquire_renderer_capture_interface()
         app_window = omni.appwindow.get_default_app_window()
         capture_api.capture_next_frame_swapchain(str(OUTPUT / 'panel.png'), app_window)
@@ -80,6 +83,12 @@ async def verify_workflow(context, sample):
         await frames(30)
         rendered = await capture(viewport, 'controller-colored.png')
         assert rendered > 100, ('controller did not render its selected color', rendered)
+        with Image.open(OUTPUT / 'before.png') as before, Image.open(OUTPUT / 'controller-colored.png') as after:
+            background = (0, 0, 32, 32)
+            original = ImageStat.Stat(before.convert('RGB').crop(background)).mean
+            colored = ImageStat.Stat(after.convert('RGB').crop(background)).mean
+            assert min(original) > 20, ('fixture background is already dark', original)
+            assert max(abs(a - b) for a, b in zip(original, colored)) < 2, ('sky changed', original, colored)
         controller.edit(color=('str:"A"', None))
         await settled(controller)
         mesh = context.get_stage().GetPrimAtPath('/World/A/Shape')
@@ -133,6 +142,24 @@ async def verify_workflow(context, sample):
         assert not controller.scheme.enabled
         controller.edit(enabled=True)
         await settled(controller)
+        other = Usd.Stage.CreateInMemory()
+        obj = UsdGeom.Xform.Define(other, '/Another/Part').GetPrim()
+        obj.CreateAttribute('bim:Category', Sdf.ValueTypeNames.String, custom=True).Set('Wall')
+        UsdGeom.Cube.Define(other, '/Another/Part/Shape')
+        other_path = OUTPUT / 'other-project.usda'
+        other.GetRootLayer().Export(str(other_path))
+        previous_layer_id = controller.overrides.layer.identifier
+        await context.close_stage_async()
+        await context.open_stage_async(str(other_path))
+        await settled(controller)
+        assert Sdf.Layer.Find(previous_layer_id) is None
+        assert {o.path for o in controller.scan.objects} == {'/Another/Part'}
+        assert controller.scheme.property_key == 'bim:Category'
+        controller.edit(enabled=True)
+        await settled(controller)
+        assert not controller.issues, controller.issues
+        bound = UsdShade.MaterialBindingAPI(context.get_stage().GetPrimAtPath('/Another/Part/Shape')).ComputeBoundMaterial()[0]
+        assert str(bound.GetPath()).startswith(controller.overrides.material_root + '/')
         stage = context.get_stage()
         extension.on_shutdown()
         extension = None
@@ -151,14 +178,19 @@ async def verify_workflow(context, sample):
 async def main():
     overrides = None
     try:
+        assert Path(sys.modules[ColorOverrides.__module__].__file__).resolve().is_relative_to(ROOT), 'Kit loaded a different Object Colors checkout'
         stage = fixture()
         UsdGeom.XformCommonAPI(stage.GetPrimAtPath('/Library')).SetTranslate(Gf.Vec3d(0, 0, -100))
         UsdGeom.XformCommonAPI(stage.GetPrimAtPath('/World/A')).SetTranslate(Gf.Vec3d(-2, 0, 0))
         UsdGeom.XformCommonAPI(stage.GetPrimAtPath('/World/B')).SetTranslate(Gf.Vec3d(2, 0, 0))
-        stage.GetPrimAtPath('/World/Looks/Glass/Surface').GetAttribute('inputs:opacity').Set(1.0)
+        solid = UsdGeom.Cube.Define(stage, '/Library/Frame')
+        solid.CreateSizeAttr(.6)
+        UsdGeom.XformCommonAPI(solid).SetTranslate(Gf.Vec3d(1.2, 0, 0))
+        UsdShade.MaterialBindingAPI.Apply(solid.GetPrim()).Bind(material(stage, '/World/Looks/Solid'))
         camera = UsdGeom.Camera.Define(stage, '/World/Camera')
         camera.AddTranslateOp().Set(Gf.Vec3d(0, 0, 15))
-        UsdLux.DomeLight.Define(stage, '/World/Light').CreateIntensityAttr(1000)
+        UsdGeom.Xform.Define(stage, '/Environment')
+        UsdLux.DomeLight.Define(stage, '/Environment/Sky').CreateIntensityAttr(1000)
         sample = OUTPUT / 'render-fixture.usda'
         stage.GetRootLayer().Export(str(sample))
         context = omni.usd.get_context()
@@ -171,6 +203,7 @@ async def main():
         overrides = ColorOverrides(stage)
         report = overrides.apply({'/World/A': '#E15759'})
         assert report.colored == 1, report.issues
+        assert not report.issues, report.issues
         colored = 0
         for _ in range(12):
             await frames(30)

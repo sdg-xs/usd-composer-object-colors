@@ -1,8 +1,8 @@
-"""Map authored scalar properties to logical objects and renderable targets."""
+"""Discover final editable Xforms and their inherited object properties."""
 
 from dataclasses import dataclass, field
 import math
-from pxr import Usd, UsdGeom
+from pxr import Usd, UsdGeom, UsdLux
 
 from .scheme import ObjectRecord
 
@@ -71,6 +71,20 @@ def scan_stage(stage) -> Scan:
             return done.value
 
 
+def _contains_scene_setup(prim, prototype_setup):
+    if prim.HasAPI(UsdLux.LightAPI) or prim.IsA(UsdGeom.Camera):
+        return True
+    root = prim.GetPrototype() if prim.IsInstance() else prim
+    path = str(root.GetPath())
+    if path in prototype_setup:
+        return prototype_setup[path]
+    found = any(p.HasAPI(UsdLux.LightAPI) or p.IsA(UsdGeom.Camera)
+                for p in Usd.PrimRange(root, Usd.TraverseInstanceProxies()))
+    if prim.IsInstance():
+        prototype_setup[path] = found
+    return found
+
+
 def scan_steps(stage):
     result = Scan()
     source_roots = set()
@@ -83,35 +97,35 @@ def scan_steps(stage):
                     source_roots.add(ref.primPath)
     for path in source_roots:
         result.issues.append(f'{path}: instance source geometry is excluded; color the placed instances instead')
-    owners: dict[str, str | None] = {}
-    properties = {}
-    targets: dict[str, list[str]] = {}
-    provenance = {}
+    properties: dict[str, dict[str, str | int | float | bool]] = {}
+    leaves: dict[str, Usd.Prim] = {}
     for index, prim in enumerate(stage.Traverse()):
         if index % 128 == 0:
             yield index
-        path = str(prim.GetPath())
         if any(prim.GetPath().HasPrefix(p) for p in source_roots):
             continue
-        parent = str(prim.GetParent().GetPath())
-        owner = owners.get(parent)
-        values = _properties(prim)
-        kind = str(values.get(HOOPS + 'TYPE', ''))
-        is_object = bool(values) and kind not in SPATIAL_TYPES
-        if is_object or (not owner and (prim.IsInstance() or prim.IsA(UsdGeom.Gprim))):
-            owner = path
-            properties[path] = values
-            targets[path] = []
-            provenance[path] = _provenance(prim)
-        owners[path] = owner
-        if prim.IsA(UsdGeom.PointInstancer):
-            result.issues.append(f'{path}: point instancers are not supported; expose objects as native instances')
-        elif owner and (prim.IsInstance() or prim.IsA(UsdGeom.Gprim)):
-            targets[owner].append(path)
-    for path, renderables in targets.items():
-        if renderables:
-            file, model = provenance[path]
-            result.objects.append(ObjectRecord(path, properties[path], file, model, tuple(renderables)))
+        if not prim.IsA(UsdGeom.Xform):
+            continue
+        path = str(prim.GetPath())
+        parent = prim.GetParent()
+        while parent and not parent.IsPseudoRoot() and not parent.IsA(UsdGeom.Xform):
+            parent = parent.GetParent()
+        parent_path = str(parent.GetPath())
+        leaves.pop(parent_path, None)
+        authored = _properties(prim)
+        properties[path] = properties.get(parent_path, {}) | authored
+        if str(authored.get(HOOPS + 'TYPE', '')) not in SPATIAL_TYPES:
+            leaves[path] = prim
+    prototype_setup: dict[str, bool] = {}
+    for index, (path, prim) in enumerate(leaves.items()):
+        if index % 128 == 0:
+            yield index
+        if any(source.HasPrefix(prim.GetPath()) for source in source_roots):
+            continue
+        if _contains_scene_setup(prim, prototype_setup):
+            continue
+        file, model = _provenance(prim)
+        result.objects.append(ObjectRecord(path, properties[path], file, model))
     result.properties = sorted({k for obj in result.objects for k in obj.properties})
     return result
 

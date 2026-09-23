@@ -1,0 +1,214 @@
+{
+  "node_count": 154,
+  "unverified_node_count": 0,
+  "raw_edge_count": 416,
+  "non_object_edges": 0,
+  "missing_endpoint_edges": 0,
+  "dangling_endpoint_edges": 53,
+  "external_reference_edges": 0,
+  "self_loop_edges": 0,
+  "valid_candidate_edges": 363,
+  "exact_duplicate_edges": 0,
+  "directed_unique_endpoint_pairs": 350,
+  "directed_same_endpoint_collapsed_edges": 13,
+  "undirected_unique_endpoint_pairs": 350,
+  "undirected_same_endpoint_collapsed_edges": 13,
+  "same_endpoint_group_count": 11,
+  "relation_variant_groups": 11,
+  "source_file_variant_groups": 0,
+  "source_location_variant_groups": 0,
+  "context_variant_groups": 0,
+  "post_build_graph_type": "Graph",
+  "post_build_node_count": 179,
+  "post_build_edge_count": 403,
+  "post_build_error": "",
+  "producer_suppression": {
+    "path": "C:\\Users\\StevenGomba\\AppData\\Roaming\\uv\\tools\\graphifyy\\Lib\\site-packages\\graphify\\extract.py",
+    "total_sites": 12,
+    "sites": [
+      {
+        "line": 1349,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1882,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1884,
+        "name": "seen_doc_refs",
+        "tuple_arity": 0,
+        "sample": "seen_doc_refs: set[str] = set()"
+      },
+      {
+        "line": 2254,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2401,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n.get(\"id\") for n in nodes}"
+      },
+      {
+        "line": 3127,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 3296,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 5370,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 5478,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 5557,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 6072,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 6073,
+        "name": "seen_edges",
+        "tuple_arity": 4,
+        "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
+      }
+    ],
+    "error": ""
+  },
+  "examples": [
+    {
+      "source": "object_colors_presets_loads",
+      "target": "object_colors_scheme_scheme",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "object_colors/presets.py"
+      ],
+      "source_locations": [
+        "L18",
+        "L42"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "generic_arg"
+      ]
+    },
+    {
+      "source": "object_colors_presets_load_scene",
+      "target": "object_colors_scheme_scheme",
+      "edge_count": 3,
+      "relations": [
+        "calls",
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "object_colors/presets.py"
+      ],
+      "source_locations": [
+        "L70",
+        "L72"
+      ],
+      "contexts": [
+        "",
+        "call",
+        "return_type"
+      ]
+    },
+    {
+      "source": "object_colors_init",
+      "target": "object_colors_extension",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "object_colors/__init__.py"
+      ],
+      "source_locations": [
+        "L8"
+      ],
+      "contexts": [
+        "export",
+        "import"
+      ]
+    },
+    {
+      "source": "object_colors_presets_dumps",
+      "target": "object_colors_scheme_scheme",
+      "edge_count": 2,
+      "relations": [
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "object_colors/presets.py"
+      ],
+      "source_locations": [
+        "L13"
+      ],
+      "contexts": [
+        "",
+        "parameter_type"
+      ]
+    },
+    {
+      "source": "object_colors_presets_read",
+      "target": "object_colors_scheme_scheme",
+      "edge_count": 2,
+      "relations": [
+        "references",
+        "uses"
+      ],
+      "source_files": [
+        "object_colors/presets.py"
+      ],
+      "source_locations": [
+        "L45"
+      ],
+      "contexts": [
+        "",
+        "generic_arg"
+      ]
+    }
+  ],
+  "diagnostic_scope": "Original pre-cleanup extraction; counts above are historical.",
+  "current_export": {
+    "nodes": 178,
+    "edges": 421,
+    "isolated_nodes": 0,
+    "dangling_endpoints": 0
+  }
+}

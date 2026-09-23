@@ -151,17 +151,16 @@ class Controller:
                 self.issues.append(reason)
             if self.scheme.enabled and not reason:
                 colors = {p: g.color for g in self.groups for p in g.objects}
-                assignments = {target: colors[obj.path] for obj in self.scan.objects
-                               for target in obj.targets if colors[obj.path] is not None}
+                assignments = {path: color for path, color in colors.items() if color is not None}
                 overrides.enabled = True
                 report = await self._drive(overrides.apply_steps(assignments), 'Applying colors')
                 self.issues.extend(report.issues)
-                detail = f'{report.colored:,} render targets colored'
+                detail = f'{report.colored:,} Xforms colored'
             else:
                 overrides.set_enabled(False)
                 detail = 'Colors off' if not self.scheme.enabled else 'No colors applied'
             if persist and not save_scene(self.stage, self.scheme):
-                self.issues.append('Scene is read-only. Export a preset to retain these choices.')
+                self.issues.append('Scene is read-only. Color choices cannot be saved to this scene.')
             self.status = f'{len(self.scan.objects):,} objects | {detail} | {perf_counter() - start:.2f}s'
         except asyncio.CancelledError:
             raise

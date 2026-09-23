@@ -23,7 +23,7 @@ scan_seconds = perf_counter() - start
 scheme = Scheme(property_key='bim:Level', enabled=True)
 groups = group_objects(scan.objects, scheme)
 colors = {p: g.color for g in groups for p in g.objects}
-assignments = {t: colors[o.path] for o in scan.objects for t in o.targets if colors[o.path]}
+assignments = {path: color for path, color in colors.items() if color is not None}
 overrides = ColorOverrides(stage)
 start = perf_counter()
 report = overrides.apply(assignments)

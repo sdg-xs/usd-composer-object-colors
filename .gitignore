@@ -2,3 +2,13 @@ __pycache__/
 *.pyc
 verification/
 .venv/
+.codex/hooks.json
+graphify-out/cache/
+graphify-out/backups/
+graphify-out/20??-??-??/
+graphify-out/.graphify_python
+graphify-out/.graphify_root
+graphify-out/*.sig
+graphify-out/cost.json
+graphify-out/cleanup.json
+graphify-out/cleanup-staging/

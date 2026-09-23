@@ -33,13 +33,14 @@ def fixture():
 class ColoringTests(unittest.TestCase):
     def test_user_geometry_named_like_the_extension_is_still_discovered(self):
         stage = Usd.Stage.CreateInMemory()
-        UsdGeom.Cube.Define(stage, '/__ObjectColorsBuilding')
+        UsdGeom.Xform.Define(stage, '/__ObjectColorsBuilding')
+        UsdGeom.Cube.Define(stage, '/__ObjectColorsBuilding/Shape')
         self.assertEqual([o.path for o in scan_stage(stage).objects], ['/__ObjectColorsBuilding'])
 
     def test_hoops_property_labels_retain_source_context(self):
         self.assertNotEqual(property_label('TYPE'), property_label('omni:hoops:metadata:TYPE'))
 
-    def test_inherited_display_opacity_and_model_mapping(self):
+    def test_solid_xform_color_ignores_display_opacity_and_keeps_model_mapping(self):
         stage = Usd.Stage.CreateInMemory()
         root = UsdGeom.Xform.Define(stage, '/World').GetPrim()
         root.CreateAttribute('objectColors:model', Sdf.ValueTypeNames.String, custom=True).Set('Architecture')
@@ -47,11 +48,12 @@ class ColoringTests(unittest.TestCase):
         UsdGeom.Cube.Define(stage, '/World/Cube')
         self.assertEqual(scan_stage(stage).objects[0].model, 'Architecture')
         overrides = ColorOverrides(stage)
-        report = overrides.apply({'/World/Cube': '#E15759'})
+        report = overrides.apply({'/World': '#E15759'})
         self.assertEqual(report.colored, 1, report.issues)
         mat = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/Cube')).ComputeBoundMaterial()[0]
-        self.assertAlmostEqual(mat.ComputeSurfaceSource()[0].GetInput('opacity').Get(), .25)
+        self.assertAlmostEqual(mat.ComputeSurfaceSource()[0].GetInput('opacity').Get(), 1.0)
         overrides.close()
+        self.assertAlmostEqual(UsdGeom.PrimvarsAPI(root).GetPrimvar('displayOpacity').Get()[0], .25)
 
     def test_visible_internal_instance_sources_are_excluded_with_a_notice(self):
         stage = fixture()
@@ -83,7 +85,7 @@ class ColoringTests(unittest.TestCase):
         overrides.close()
         self.assertEqual(stage.GetRootLayer().ExportToString(), source)
 
-    def test_connected_opacity_is_reported_and_left_untouched(self):
+    def test_connected_opacity_does_not_block_solid_color_and_restores(self):
         stage = fixture()
         shader = UsdShade.Shader.Get(stage, '/World/Looks/Glass/Surface')
         texture = UsdShade.Shader.Define(stage, '/World/Looks/Glass/Alpha')
@@ -91,34 +93,90 @@ class ColoringTests(unittest.TestCase):
         shader.GetInput('opacity').ConnectToSource(texture.ConnectableAPI(), 'a')
         overrides = ColorOverrides(stage)
         report = overrides.apply({'/World/A': '#E15759'})
-        self.assertEqual(report.colored, 0)
-        self.assertIn('connected opacity', report.issues[0])
+        self.assertEqual(report.colored, 1, report.issues)
+        self.assertEqual(report.issues, [])
         mat = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
-        self.assertEqual(str(mat.GetPath()), '/World/Looks/Glass')
+        self.assertAlmostEqual(mat.ComputeSurfaceSource()[0].GetInput('opacity').Get(), 1.0)
+        overrides.close()
+        restored = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+        self.assertEqual(str(restored.GetPath()), '/World/Looks/Glass')
+        self.assertTrue(shader.GetInput('opacity').HasConnectedSource())
+
+    def test_mdl_only_material_is_colored_and_restored(self):
+        stage = fixture()
+        mat = UsdShade.Material.Get(stage, '/World/Looks/Glass')
+        mat.GetPrim().RemoveProperty('outputs:surface')
+        shader = UsdShade.Shader.Define(stage, '/World/Looks/Glass/Mdl')
+        shader.SetSourceAsset(Sdf.AssetPath('OmniPBR.mdl'), 'mdl')
+        shader.SetSourceAssetSubIdentifier('OmniPBR', 'mdl')
+        shader.CreateOutput('out', Sdf.ValueTypeNames.Token)
+        mat.CreateSurfaceOutput('mdl').ConnectToSource(shader.ConnectableAPI(), 'out')
+        source = stage.GetRootLayer().ExportToString()
+        overrides = ColorOverrides(stage)
+        try:
+            report = overrides.apply({'/World/A': '#E15759'})
+            self.assertEqual(report.colored, 1, report.issues)
+            for purpose in ('', 'full', 'preview'):
+                bound = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial(purpose)[0]
+                self.assertAlmostEqual(bound.ComputeSurfaceSource()[0].GetInput('opacity').Get(), 1.0)
+            overrides.apply({})
+            restored = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+            self.assertEqual(restored.GetPath(), mat.GetPath())
+            self.assertEqual(restored.ComputeSurfaceSource('mdl')[0].GetPath(), shader.GetPath())
+            self.assertEqual(stage.GetRootLayer().ExportToString(), source)
+        finally:
+            overrides.close()
+
+    def test_stronger_session_collection_rejects_only_its_xform(self):
+        stage = fixture()
+        original = UsdShade.Material.Get(stage, '/World/Looks/Glass')
+        with Usd.EditContext(stage, stage.GetSessionLayer()):
+            root = stage.GetPrimAtPath('/World')
+            collection = Usd.CollectionAPI.Apply(root, 'sessionPriority')
+            collection.CreateIncludesRel().SetTargets(['/World/A'])
+            api = UsdShade.MaterialBindingAPI.Apply(root)
+            for purpose in ('', 'full', 'preview'):
+                api.Bind(collection, original, 'sessionPriority', UsdShade.Tokens.strongerThanDescendants, purpose)
+            root.SetPropertyOrder([r.GetName() for r in root.GetRelationships()
+                                   if r.GetName().startswith('material:binding:')])
+        overrides = ColorOverrides(stage)
+        report = overrides.apply({'/World/A': '#E15759', '/World/B': '#E15759'})
+        self.assertEqual(report.colored, 1, report.issues)
+        self.assertEqual(report.issues, ['/World/A: existing binding prevented coloring'])
+        included = Usd.CollectionAPI(stage.GetPrimAtPath('/World'), 'objectColors_E15759').GetIncludesRel().GetTargets()
+        self.assertEqual(included, [Sdf.Path('/World/B')])
         overrides.close()
 
-    def test_mixed_opacity_instance_and_subsets_keep_each_parts_opacity(self):
+    def test_mixed_opacity_instance_and_subsets_use_one_solid_xform_color(self):
         stage = fixture()
         solid = material(stage, '/World/Looks/Solid', 1.0)
         second = UsdGeom.Cube.Define(stage, '/Library/Solid')
         UsdShade.MaterialBindingAPI.Apply(second.GetPrim()).Bind(solid)
-        mesh = UsdGeom.Mesh.Define(stage, '/World/Mesh')
-        subset = UsdGeom.Subset.Define(stage, '/World/Mesh/GlassFaces')
+        UsdGeom.Xform.Define(stage, '/World/Object')
+        mesh = UsdGeom.Mesh.Define(stage, '/World/Object/Mesh')
+        subset = UsdGeom.Subset.Define(stage, '/World/Object/Mesh/GlassFaces')
         subset.CreateFamilyNameAttr('materialBind')
         subset.CreateElementTypeAttr('face')
         subset.CreateIndicesAttr([0])
         UsdShade.MaterialBindingAPI.Apply(mesh.GetPrim()).Bind(solid)
         UsdShade.MaterialBindingAPI.Apply(subset.GetPrim()).Bind(UsdShade.Material.Get(stage, '/World/Looks/Glass'))
         overrides = ColorOverrides(stage)
-        report = overrides.apply({'/World/A': '#E15759', '/World/Mesh': '#E15759'})
-        self.assertEqual(report.colored, 1, report.issues)
-        self.assertIn('mixed opacity', report.issues[0])
-        self.assertEqual(str(UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0].GetPath()), '/World/Looks/Glass')
-        for path, expected in [('/World/A/Shape', .35), ('/World/A/Solid', 1.0),
-                               ('/World/Mesh', 1.0), ('/World/Mesh/GlassFaces', .35)]:
+        source = stage.GetRootLayer().ExportToString()
+        report = overrides.apply({'/World/A': '#E15759', '/World/Object': '#E15759'})
+        self.assertEqual(report.colored, 2, report.issues)
+        self.assertEqual(report.issues, [])
+        parts = [('/World/A/Shape', .35), ('/World/A/Solid', 1.0),
+                 ('/World/Object/Mesh', 1.0), ('/World/Object/Mesh/GlassFaces', .35)]
+        for path, _ in parts:
+            mat = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath(path)).ComputeBoundMaterial()[0]
+            self.assertAlmostEqual(mat.ComputeSurfaceSource()[0].GetInput('opacity').Get(), 1.0)
+            self.assertTrue(str(mat.GetPath()).startswith(overrides.material_root + '/'))
+            self.assertIsNone(overrides.layer.GetPrimAtPath(path))
+        overrides.close()
+        for path, expected in parts:
             mat = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath(path)).ComputeBoundMaterial()[0]
             self.assertAlmostEqual(mat.ComputeSurfaceSource()[0].GetInput('opacity').Get(), expected, places=5)
-        overrides.close()
+        self.assertEqual(stage.GetRootLayer().ExportToString(), source)
 
     def test_discovery_counts_a_multimesh_object_once_and_keeps_qualified_keys(self):
         stage = Usd.Stage.CreateInMemory()
@@ -129,10 +187,10 @@ class ColoringTests(unittest.TestCase):
         UsdGeom.Cube.Define(stage, '/World/Wall/B')
         result = scan_stage(stage)
         self.assertEqual(len(result.objects), 1)
-        self.assertEqual(result.objects[0].targets, ('/World/Wall/A', '/World/Wall/B'))
+        self.assertEqual(result.objects[0].path, '/World/Wall')
         self.assertEqual(set(result.properties), {'bim:instance:Workset', 'bim:type:Workset'})
 
-    def test_instance_color_preserves_opacity_and_other_instance_and_restores(self):
+    def test_solid_instance_color_leaves_other_instance_unchanged_and_restores(self):
         stage = fixture()
         source = stage.GetRootLayer().ExportToString()
         original = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0].GetPath()
@@ -144,7 +202,7 @@ class ColoringTests(unittest.TestCase):
         self.assertNotEqual(a.GetPath(), original)
         self.assertEqual(b.GetPath(), original)
         shader = a.ComputeSurfaceSource()[0]
-        self.assertAlmostEqual(shader.GetInput('opacity').Get(), .35, places=5)
+        self.assertAlmostEqual(shader.GetInput('opacity').Get(), 1.0, places=5)
         self.assertTrue(stage.GetPrimAtPath('/World/A').IsInstance())
         overrides.set_enabled(False)
         self.assertEqual(UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0].GetPath(), original)

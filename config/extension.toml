@@ -1,7 +1,7 @@
 [package]
 version = "0.1.0"
 title = "Object Colors"
-description = "Color whole USD scenes by properties, source file, or model with reusable templates."
+description = "Color whole USD scenes by properties, source file, or model."
 category = "Visualization"
 keywords = ["color", "BIM", "IFC", "properties", "palette"]
 readme = "README.md"
@@ -14,6 +14,3 @@ readme = "README.md"
 
 [[python.module]]
 name = "object_colors"
-
-[settings]
-exts."object.color".templateDirectory = ""

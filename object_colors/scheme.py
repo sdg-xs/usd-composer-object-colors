@@ -23,7 +23,6 @@ class ObjectRecord:
     properties: dict[str, str | int | float | bool]
     file: str = ''
     model: str = ''
-    targets: tuple[str, ...] = ()
 
 
 @dataclass

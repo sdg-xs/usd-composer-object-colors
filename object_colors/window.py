@@ -1,10 +1,8 @@
 """Composer-native panel with a searchable property selector and fixed swatches."""
 from pathlib import Path
 
-import carb.settings
 import omni.ui as ui
 
-from . import presets
 from .discovery import property_label
 from .scheme import PALETTE
 
@@ -20,28 +18,10 @@ class ObjectColorsWindow:
         self.controller = controller
         self.window = ui.Window('Object Colors', width=440, height=690)
         self.search = ui.SimpleStringModel('')
-        self.name = ui.SimpleStringModel('My colors')
-        self.file_path = ui.SimpleStringModel('')
-        self.template_index = 0
         self.palette_window = None
-        self.templates = []
-        self._load_templates()
         controller.listeners.append(self.update)
         self.window.frame.set_build_fn(self.build)
         self.search.add_value_changed_fn(lambda _: self.property_frame.rebuild())
-
-    def _load_templates(self):
-        directories = [Path(__file__).resolve().parent.parent / 'data/templates']
-        configured = carb.settings.get_settings().get('/exts/object.color/templateDirectory')
-        if configured:
-            directories.append(Path(configured))
-        for directory in directories:
-            for path in sorted(directory.glob('*.json')):
-                try:
-                    name, _ = presets.read(path)
-                    self.templates.append((name, path))
-                except (ValueError, OSError) as exc:
-                    self.controller.issues.append(f'{path.name}: {exc}')
 
     def update(self, rebuild=True):
         if rebuild:
@@ -77,27 +57,11 @@ class ObjectColorsWindow:
                     ui.Label(reason, word_wrap=True, height=34, style={'color': 0xFF88BBFF})
                 if controller.scheme.mode == 'Property':
                     with ui.HStack(height=24):
-                        ui.Label('Find property', width=90)
+                        ui.Image(str(Path(__file__).resolve().parent.parent / 'data/search.svg'),
+                                 width=24, height=24, tooltip='Search properties')
                         ui.StringField(self.search, tooltip='Filter property names and categories')
-                    self.property_frame = ui.Frame(height=26)
+                    self.property_frame = ui.Frame(height=0)
                     self.property_frame.set_build_fn(self._build_properties)
-                with ui.CollapsableFrame('Shared templates', height=0, collapsed=False):
-                    with ui.VStack(spacing=6, margin=6):
-                        ui.Label('Load a copy. Your edits do not change the template.', height=20)
-                        if self.templates:
-                            with ui.HStack(height=25):
-                                template = ui.ComboBox(self.template_index, *(n for n, _ in self.templates))
-                                template.model.add_item_changed_fn(self._template_changed)
-                                ui.Button('Load', width=60, clicked_fn=self._load_template)
-                        with ui.HStack(height=24):
-                            ui.Label('Preset name', width=85)
-                            ui.StringField(self.name)
-                        with ui.HStack(height=24):
-                            ui.Label('JSON path', width=85)
-                            ui.StringField(self.file_path, tooltip='Full path to a JSON preset file')
-                        with ui.HStack(height=24):
-                            ui.Button('Import JSON', clicked_fn=self._import)
-                            ui.Button('Export new JSON', clicked_fn=self._export)
             ui.Separator(height=2)
             with ui.HStack(height=22):
                 ui.Label('Value')
@@ -109,28 +73,55 @@ class ObjectColorsWindow:
                         with ui.HStack(height=26, spacing=6):
                             ui.Label(group.label, tooltip=group.key, elided_text=True)
                             ui.Label(str(len(group.objects)), width=56, alignment=ui.Alignment.RIGHT_CENTER)
-                            ui.Button('None' if group.color is None else 'Edit', width=52, height=24,
-                                      style={'background_color': swatch_color(group.color), 'color': 0xFF111111},
-                                      tooltip='Change group color', clicked_fn=lambda g=group: self._palette(g))
+                            with ui.HStack(width=58, height=24):
+                                ui.Spacer()
+                                color = swatch_color(group.color)
+                                ui.Button('', width=24, height=24,
+                                          style={
+                                              'Button': {'background_color': color, 'border_radius': 12,
+                                                         'border_width': 0, 'padding': 12, 'margin': 0},
+                                              'Button:hovered': {'background_color': color},
+                                              'Button:pressed': {'background_color': color},
+                                          },
+                                          tooltip='Color', clicked_fn=lambda g=group: self._palette(g))
+                                ui.Spacer()
             self.status_label = ui.Label(controller.status, height=36, word_wrap=True)
             if controller.issues:
                 notice_label = 'notice' if len(controller.issues) == 1 else 'notices'
                 with ui.CollapsableFrame(f'{len(controller.issues)} {notice_label}', height=0, collapsed=True):
                     with ui.ScrollingFrame(height=110):
                         ui.Label('\n'.join(controller.issues), word_wrap=True, alignment=ui.Alignment.LEFT_TOP)
-            ui.Label('Save the scene to retain its active scheme. Export JSON to reuse it.',
+            ui.Label('Save the scene to retain its active color scheme.',
                      word_wrap=True, height=32, style={'color': 0xFFAAAAAA})
 
     def _build_properties(self):
-        keys = [k for k in self.controller.scan.properties if self.search.as_string.casefold() in property_label(k).casefold()]
+        query = self.search.as_string.strip().casefold()
+        keys = [k for k in self.controller.scan.properties if query in property_label(k).casefold()]
         active = self.controller.scheme.property_key
+        if query:
+            if not keys:
+                ui.Label('No matching properties', height=26)
+                return
+            with ui.ScrollingFrame(height=min(len(keys), 6) * 28,
+                                   horizontal_scrollbar_policy=ui.ScrollBarPolicy.SCROLLBAR_ALWAYS_OFF):
+                with ui.VStack(spacing=2, height=0):
+                    for key in keys:
+                        ui.Button(property_label(key), height=26, tooltip=key,
+                                  style={'Button.Label': {'alignment': ui.Alignment.LEFT_CENTER}},
+                                  clicked_fn=lambda k=key: self._select_property(k))
+            return
         if active and active not in keys:
             keys.insert(0, active)
         if not keys:
-            ui.Label('No matching properties')
+            ui.Label('No matching properties', height=26)
             return
-        combo = ui.ComboBox(keys.index(active) if active in keys else 0, *(property_label(k) for k in keys))
-        combo.model.add_item_changed_fn(lambda m, _: self.controller.edit(property_key=keys[m.get_item_value_model().as_int]))
+        combo = ui.ComboBox(keys.index(active) if active in keys else 0, *(property_label(k) for k in keys), height=26)
+        combo.model.add_item_changed_fn(lambda m, _: self._select_property(keys[m.get_item_value_model().as_int]))
+
+    def _select_property(self, key):
+        self.search.set_value('')
+        if key != self.controller.scheme.property_key:
+            self.controller.edit(property_key=key)
 
     def _palette(self, group):
         if self.palette_window:
@@ -155,34 +146,6 @@ class ObjectColorsWindow:
                 or self.controller.scheme.criterion != criterion):
             return
         self.controller.edit(color=(key, color))
-
-    def _template_changed(self, model, _):
-        self.template_index = model.get_item_value_model().as_int
-
-    def _message(self, operation):
-        try:
-            operation()
-        except (OSError, ValueError) as exc:
-            self.controller.status = str(exc)
-            self.update()
-
-    def _load(self, path):
-        name, scheme = presets.read(path)
-        self.name.set_value(name)
-        self.controller.change(scheme)
-
-    def _load_template(self):
-        self._message(lambda: self._load(self.templates[self.template_index][1]))
-
-    def _import(self):
-        self._message(lambda: self._load(self.file_path.as_string))
-
-    def _export(self):
-        def write():
-            presets.export(self.file_path.as_string, self.name.as_string, self.controller.scheme)
-            self.controller.status = 'Preset exported. Shared templates were not changed.'
-            self.update()
-        self._message(write)
 
     def close(self):
         self.controller.listeners.remove(self.update)

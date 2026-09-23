@@ -1,8 +1,6 @@
 """Stage-local visualization layer; source geometry and materials are never edited."""
 
 from dataclasses import dataclass, field
-import hashlib
-import math
 
 from pxr import Gf, Sdf, Usd, UsdGeom, UsdShade
 
@@ -14,39 +12,6 @@ PURPOSES = ('', 'full', 'preview')
 class ApplyReport:
     colored: int = 0
     issues: list[str] = field(default_factory=list)
-
-
-def _renderables(prim):
-    return [p for p in Usd.PrimRange(prim, Usd.TraverseInstanceProxies())
-            if p.IsA(UsdGeom.Gprim) or p.IsA(UsdGeom.Subset)]
-
-
-def _opacity(prim, purpose):
-    mat, _ = UsdShade.MaterialBindingAPI(prim).ComputeBoundMaterial(purpose)
-    if not mat:
-        opacity = UsdGeom.PrimvarsAPI(prim).FindPrimvarWithInheritance('displayOpacity')
-        if opacity and opacity.GetAttr().GetNumTimeSamples():
-            raise ValueError('animated opacity is not supported')
-        values = opacity.ComputeFlattened() if opacity else None
-        if values and len(set(values)) != 1:
-            raise ValueError('varying displayOpacity requires a material adapter')
-        return (float(values[0]) if values else 1.0, 0.0)
-    shader, _, _ = mat.ComputeSurfaceSource()
-    if not shader or shader.GetIdAttr().Get() != 'UsdPreviewSurface':
-        raise ValueError('only USD Preview Surface opacity is supported')
-    values = []
-    for name, default in (('opacity', 1.0), ('opacityThreshold', 0.0)):
-        inp = shader.GetInput(name)
-        if inp and inp.GetAttr().GetNumTimeSamples():
-            raise ValueError('animated opacity is not supported')
-        if inp and inp.HasConnectedSource():
-            raise ValueError('connected opacity requires a material adapter')
-        value = inp.Get() if inp else None
-        number = float(default if value is None else value)
-        if not math.isfinite(number):
-            raise ValueError('non-finite opacity is not supported')
-        values.append(number)
-    return tuple(values)
 
 
 def _linear(hex_color):
@@ -86,41 +51,24 @@ class ColorOverrides:
         try:
             new_layer = Sdf.Layer.CreateAnonymous('object-colors.usda')
             work = Usd.Stage.Open(new_layer)
-            batches: dict[tuple, list[str]] = {}
-            checks = {}
+            batches: dict[tuple[str, str], list[str]] = {}
+            checks = []
             for index, (path, color) in enumerate(assignments.items()):
                 if index % 64 == 0:
-                    yield .6 * index / max(1, len(assignments))
+                    yield .4 * index / len(assignments)
                 prim = self.stage.GetPrimAtPath(path)
                 if not prim or prim.IsInstanceProxy() or prim.IsA(UsdGeom.PointInstancer):
                     report.issues.append(f'{path}: cannot override this instance boundary')
                     continue
-                targets = _renderables(prim)
-                if not targets:
+                if not any(p.IsA(UsdGeom.Gprim) for p in Usd.PrimRange(prim, Usd.TraverseInstanceProxies())):
                     report.issues.append(f'{path}: no loaded renderable geometry')
                     continue
-                profiles = []
-                try:
-                    if prim.IsInstance():
-                        for purpose in PURPOSES:
-                            opacities = {_opacity(target, purpose) for target in targets}
-                            if len(opacities) != 1:
-                                raise ValueError('mixed opacity inside a native instance; use non-instance geometry to color its parts')
-                            profiles.append((path, purpose, opacities.pop()))
-                    else:
-                        for target in targets:
-                            for purpose in PURPOSES:
-                                profiles.append((str(target.GetPath()), purpose, _opacity(target, purpose)))
-                except ValueError as exc:
-                    report.issues.append(f'{path}: {exc}')
-                    continue
                 root = '/' + path.strip('/').split('/')[0]
-                checks[path] = [str(p.GetPath()) for p in targets]
-                expansion = Usd.Tokens.expandPrims if prim.IsInstance() else Usd.Tokens.explicitOnly
-                for target, purpose, opacity in profiles:
-                    batches.setdefault((root, purpose, color, opacity, expansion), []).append(target)
-            for (root, purpose, color, opacity, expansion), paths in batches.items():
-                key = hashlib.sha256(repr((color, opacity)).encode()).hexdigest()[:16]
+                checks.append(path)
+                batches.setdefault((root, color), []).append(path)
+            authored = 0
+            for (root, color), paths in batches.items():
+                key = color.removeprefix('#')
                 mat_path = self.material_root + '/C' + key
                 mat = UsdShade.Material.Get(work, mat_path)
                 if not mat:
@@ -128,22 +76,26 @@ class ColorOverrides:
                     shader = UsdShade.Shader.Define(work, mat_path + '/Surface')
                     shader.CreateIdAttr('UsdPreviewSurface')
                     shader.CreateInput('diffuseColor', Sdf.ValueTypeNames.Color3f).Set(_linear(color))
-                    shader.CreateInput('opacity', Sdf.ValueTypeNames.Float).Set(opacity[0])
-                    shader.CreateInput('opacityThreshold', Sdf.ValueTypeNames.Float).Set(opacity[1])
+                    shader.CreateInput('opacity', Sdf.ValueTypeNames.Float).Set(1.0)
+                    shader.CreateInput('opacityThreshold', Sdf.ValueTypeNames.Float).Set(0.0)
                     shader.CreateInput('roughness', Sdf.ValueTypeNames.Float).Set(.65)
                     mat.CreateSurfaceOutput().ConnectToSource(shader.ConnectableAPI(), 'surface')
                 root_prim = work.OverridePrim(root)
-                for index, path in enumerate(paths):
-                    if index % 128 == 0:
-                        yield .7
-                    target = work.OverridePrim(path)
-                    UsdShade.MaterialBindingAPI.Apply(target).Bind(mat, UsdShade.Tokens.strongerThanDescendants, purpose)
-                name = 'objectColors_' + key + '_' + (purpose or 'all') + '_' + expansion
+                name = 'objectColors_' + key
                 collection = Usd.CollectionAPI.Apply(root_prim, name)
-                collection.CreateExpansionRuleAttr().Set(expansion)
+                collection.CreateExpansionRuleAttr().Set(Usd.Tokens.expandPrims)
                 collection.CreateIncludesRel().SetTargets(paths)
-                UsdShade.MaterialBindingAPI.Apply(root_prim).Bind(
-                    collection, mat, name, UsdShade.Tokens.strongerThanDescendants, purpose)
+                for purpose in PURPOSES:
+                    UsdShade.MaterialBindingAPI.Apply(root_prim).Bind(
+                        collection, mat, name, UsdShade.Tokens.strongerThanDescendants, purpose)
+                # RTX needs a direct binding on the editable instance root.
+                for path in paths:
+                    if authored % 128 == 0:
+                        yield .4 + .4 * authored / len(checks)
+                    api = UsdShade.MaterialBindingAPI.Apply(work.OverridePrim(path))
+                    for purpose in PURPOSES:
+                        api.Bind(mat, UsdShade.Tokens.strongerThanDescendants, purpose)
+                    authored += 1
             # Prepend our collections to source collection ordering at each root.
             for root in {k[0] for k in batches}:
                 prim = work.GetPrimAtPath(root)
@@ -153,27 +105,30 @@ class ColorOverrides:
             self._replace(new_layer)
             # Reject rather than silently accept a stronger session opinion or unsupported binding.
             rejected = set()
-            for index, (path, targets) in enumerate(checks.items()):
-                if index % 64 == 0:
-                    yield .8 + .2 * index / max(1, len(checks))
-                if all(str(UsdShade.MaterialBindingAPI(self.stage.GetPrimAtPath(p)).ComputeBoundMaterial(purpose)[0].GetPath()).startswith(self.material_root + '/')
-                       for p in targets for purpose in PURPOSES):
-                    report.colored += 1
-                else:
+            for index in range(0, len(checks), 128):
+                yield .8 + .2 * index / len(checks)
+                paths = checks[index:index + 128]
+                prims = [self.stage.GetPrimAtPath(path) for path in paths]
+                for purpose in PURPOSES:
+                    materials, _ = UsdShade.MaterialBindingAPI.ComputeBoundMaterials(prims, purpose)
+                    for path, mat in zip(paths, materials):
+                        expected = self.material_root + '/C' + assignments[path].removeprefix('#')
+                        if not mat or str(mat.GetPath()) != expected:
+                            rejected.add(path)
+            for path in checks:
+                if path in rejected:
                     report.issues.append(f'{path}: existing binding prevented coloring')
-                    rejected.update(targets)
-                    rejected.add(path)
+                else:
+                    report.colored += 1
             if rejected:
-                for prim in work.Traverse():
-                    for rel in prim.GetRelationships():
-                        if rel.GetName().startswith('collection:') and rel.GetName().endswith(':includes'):
-                            rel.SetTargets([p for p in rel.GetTargets() if str(p) not in rejected])
-                for path in rejected:
-                    prim = work.GetPrimAtPath(path)
-                    if prim:
+                with Sdf.ChangeBlock():
+                    for (root, color), paths in batches.items():
+                        collection = Usd.CollectionAPI(work.GetPrimAtPath(root), 'objectColors_' + color.removeprefix('#'))
+                        collection.GetIncludesRel().SetTargets([p for p in paths if p not in rejected])
+                    for path in rejected:
+                        prim = work.GetPrimAtPath(path)
                         for purpose in PURPOSES:
-                            name = 'material:binding' + (':' + purpose if purpose else '')
-                            prim.RemoveProperty(name)
+                            prim.RemoveProperty('material:binding' + (':' + purpose if purpose else ''))
             return report
         finally:
             self.set_enabled(self.enabled)
