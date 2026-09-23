@@ -45,7 +45,7 @@
       "file_type": "code",
       "norm_label": "group",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L53"
+      "source_location": "L56"
     },
     {
       "id": "object_colors_scheme_objectrecord",
@@ -322,7 +322,7 @@
       "file_type": "code",
       "norm_label": "group_objects()",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L68"
+      "source_location": "L71"
     },
     {
       "id": "object_colors_scheme_scheme_color",
@@ -358,7 +358,7 @@
       "file_type": "code",
       "norm_label": ".set_color()",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L46"
+      "source_location": "L49"
     },
     {
       "id": "object_colors_scheme_value_key",
@@ -370,7 +370,7 @@
       "file_type": "code",
       "norm_label": "value_key()",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L60"
+      "source_location": "L63"
     },
     {
       "id": "tests_test_presets_presettests_test_bad_imports_are_rejected",
@@ -2837,7 +2837,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L74",
+      "source_location": "L77",
       "weight": 1.0
     },
     {
@@ -2849,7 +2849,7 @@
       "confidence_score": 1.0,
       "context": "call",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L85",
+      "source_location": "L88",
       "weight": 1.0
     },
     {
@@ -3665,7 +3665,7 @@
       "confidence_score": 1.0,
       "context": "generic_arg",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L68",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -5141,7 +5141,7 @@
       "confidence_score": 1.0,
       "context": "parameter_type",
       "source_file": "object_colors/scheme.py",
-      "source_location": "L68",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -5407,7 +5407,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "object_colors/scheme.py",
-      "source_location": "L53",
+      "source_location": "L56",
       "weight": 1.0
     },
     {
@@ -5418,7 +5418,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "object_colors/scheme.py",
-      "source_location": "L60",
+      "source_location": "L63",
       "weight": 1.0
     },
     {
@@ -5429,7 +5429,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "object_colors/scheme.py",
-      "source_location": "L68",
+      "source_location": "L71",
       "weight": 1.0
     },
     {
@@ -5880,7 +5880,7 @@
       "confidence": "EXTRACTED",
       "confidence_score": 1.0,
       "source_file": "object_colors/scheme.py",
-      "source_location": "L46",
+      "source_location": "L49",
       "weight": 1.0
     },
     {
@@ -7183,5 +7183,5 @@
       "source_file": "docs/verification.md"
     }
   ],
-  "built_at_commit": "0c215bdac8da2eff635734786fc75724ca3cba54"
+  "built_at_commit": "28de0655c08f7b77739c1186ebc49137921d8d64"
 }

@@ -22,7 +22,7 @@ Xforms containing lights or cameras are excluded, including native instances of 
 
 The first 100 typed values in deterministic key order appear individually. Additional values form **Unmapped**. Missing values form **Unassigned**, separate from a literal string with that name. The tooltip shows the typed key when labels look alike.
 
-Palette assignments are stored per criterion. They survive refreshes and switches between properties, including assignments for values absent from the current scene. New assignments use a stable hash and a fixed 40-color palette. The palette is not an exact copy of Forma's swatches.
+Palette assignments are stored per criterion. They survive refreshes and switches between properties, including assignments for values absent from the current scene. Unassigned defaults to `#969696` unless a saved color or No color choice already exists. Other new assignments use a stable hash and a fixed 40-color palette. The palette is not an exact copy of Forma's swatches.
 
 ## Solid coloring and restoration
 

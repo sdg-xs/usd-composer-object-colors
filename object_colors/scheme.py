@@ -39,8 +39,11 @@ class Scheme:
     def color(self, key: str) -> str | None:
         palette = self.palettes.setdefault(self.criterion, {})
         if key not in palette:
-            digest = hashlib.sha256((self.criterion + '\0' + key).encode()).digest()
-            palette[key] = PALETTE[int.from_bytes(digest[:4], 'big') % len(PALETTE)]
+            if key == 'missing':
+                palette[key] = '#969696'
+            else:
+                digest = hashlib.sha256((self.criterion + '\0' + key).encode()).digest()
+                palette[key] = PALETTE[int.from_bytes(digest[:4], 'big') % len(PALETTE)]
         return palette[key]
 
     def set_color(self, key: str, color: str | None) -> None:

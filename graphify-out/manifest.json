@@ -1,10 +1,4 @@
 {
-  ".codex/hooks.json": {
-    "mtime": 1790146143.1461694,
-    "seen": 1790146760.1245596,
-    "ast_hash": "3c197917179a0a57027839461477111b",
-    "semantic_hash": "3c197917179a0a57027839461477111b"
-  },
   "data/templates/ifc-type.json": {
     "mtime": 1790000133.7778099,
     "seen": 1790146760.1245642,
@@ -54,10 +48,10 @@
     "semantic_hash": "7c16431bcf93f69b986b33bad8dffd94"
   },
   "object_colors/scheme.py": {
-    "mtime": 1790070651.6724527,
-    "seen": 1790146760.1245728,
-    "ast_hash": "3e024e1cd6268e3c60f4c1becd3d1eb5",
-    "semantic_hash": "3e024e1cd6268e3c60f4c1becd3d1eb5"
+    "mtime": 1790150198.2868004,
+    "seen": 1790150209.2901587,
+    "ast_hash": "036deef2032a91fdb90fc040ee3a1a31",
+    "semantic_hash": ""
   },
   "object_colors/window.py": {
     "mtime": 1790074918.7180552,
@@ -126,10 +120,10 @@
     "semantic_hash": "2036a0adf427f4d5cf396302b1b0ef93"
   },
   "docs/reference.md": {
-    "mtime": 1790074912.7682056,
-    "seen": 1790146760.1245828,
-    "ast_hash": "8cef424b971bb99c4668db545bf80017",
-    "semantic_hash": "8cef424b971bb99c4668db545bf80017"
+    "mtime": 1790150198.2877994,
+    "seen": 1790150209.2912002,
+    "ast_hash": "e0626739fbbbc1ad35ee39f2f765ff8f",
+    "semantic_hash": ""
   },
   "docs/review.md": {
     "mtime": 1790001899.3279786,
