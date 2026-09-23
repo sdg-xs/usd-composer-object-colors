@@ -19,8 +19,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path[:0] = [str(ROOT), str(ROOT / 'tests')]
 from test_usd import fixture, material
 from object_colors.overrides import ColorOverrides
-from object_colors.extension import ObjectColorsExtension
-from object_colors.presets import read
+from object_colors.extension import ObjectColorsExtension, get_controller
+from object_colors.presets import load_scene, read
 
 APP = omni.kit.app.get_app()
 OUTPUT = ROOT / 'verification'
@@ -54,6 +54,51 @@ async def settled(controller):
     assert not controller.status.startswith('Could not'), controller.status
 
 
+async def verify_inspection(controller, context):
+    stage = context.get_stage()
+    assert get_controller() is controller
+    source = stage.GetRootLayer().ExportToString()
+    scope = controller.begin_inspection(stage)
+    assert controller.inspection_active
+    assert not controller.overrides.enabled
+    try:
+        scan = await controller.get_scan(refresh=True)
+        assert {o.path for o in scan.objects} == {'/World/A', '/World/B'}
+        try:
+            controller.begin_inspection(stage)
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('A second inspection scope was accepted')
+        report = await scope.apply({'/World/A': '#4E79A7', '/Missing': '#E15759'})
+        assert report.colored_paths == ['/World/A'], report
+        assert report.unsupported_paths == ['/Missing'], report
+        bound = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+        assert str(bound.GetPath()) == controller.overrides.material_root + '/C4E79A7'
+        controller.edit(color=('str:"A"', '#59A14F'))
+        assert load_scene(stage).color('str:"A"') == '#59A14F'
+        bound = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+        assert str(bound.GetPath()) == controller.overrides.material_root + '/C4E79A7'
+        empty = await scope.apply({})
+        assert empty.colored == 0
+        bound = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+        assert str(bound.GetPath()) == '/World/Looks/Glass'
+    finally:
+        await scope.close()
+    assert not controller.inspection_active
+    bound = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+    assert str(bound.GetPath()) == controller.overrides.material_root + '/C59A14F'
+    assert stage.GetRootLayer().ExportToString() != source  # Only the deliberate scheme edit persists.
+    try:
+        await scope.apply({'/World/A': '#E15759'})
+    except RuntimeError:
+        pass
+    else:
+        raise AssertionError('A closed inspection scope was accepted')
+    controller.edit(color=('str:"A"', '#E15759'))
+    await settled(controller)
+
+
 async def verify_workflow(context, sample):
     manager = APP.get_extension_manager()
     extension_id = manager.get_enabled_extension_id('object.color')
@@ -83,6 +128,7 @@ async def verify_workflow(context, sample):
         await frames(30)
         rendered = await capture(viewport, 'controller-colored.png')
         assert rendered > 100, ('controller did not render its selected color', rendered)
+        await verify_inspection(controller, context)
         with Image.open(OUTPUT / 'before.png') as before, Image.open(OUTPUT / 'controller-colored.png') as after:
             background = (0, 0, 32, 32)
             original = ImageStat.Stat(before.convert('RGB').crop(background)).mean
@@ -125,10 +171,18 @@ async def verify_workflow(context, sample):
         controller.edit(property_key='bim:Level', enabled=True)
         await settled(controller)
         context.get_stage().GetRootLayer().Save()
+        stale_scope = controller.begin_inspection(context.get_stage())
+        await stale_scope.apply({'/World/A': '#E15759'})
         previous_layer_id = controller.overrides.layer.identifier
         await context.close_stage_async()
         await context.open_stage_async(str(sample))
         await settled(controller)
+        try:
+            await stale_scope.apply({'/World/A': '#E15759'})
+        except RuntimeError:
+            pass
+        else:
+            raise AssertionError('A scope from the closed stage was accepted')
         assert Sdf.Layer.Find(previous_layer_id) is None
         assert controller.scheme.enabled
         assert controller.scheme.property_key == 'bim:Level'

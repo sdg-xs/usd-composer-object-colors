@@ -31,6 +31,35 @@ def fixture():
 
 
 class ColoringTests(unittest.TestCase):
+    def test_cancelled_replacement_keeps_the_previous_color_layer(self):
+        stage = fixture()
+        overrides = ColorOverrides(stage)
+        try:
+            first = overrides.apply({'/World/A': '#E15759'})
+            self.assertEqual(first.colored_paths, ['/World/A'])
+            prior = overrides.layer
+            steps = overrides.apply_steps({'/World/A': '#4E79A7'})
+            while overrides.layer is prior:
+                next(steps)
+            steps.close()
+            self.assertIs(overrides.layer, prior)
+            self.assertEqual(list(stage.GetSessionLayer().subLayerPaths), [prior.identifier])
+            material = UsdShade.MaterialBindingAPI(stage.GetPrimAtPath('/World/A/Shape')).ComputeBoundMaterial()[0]
+            self.assertEqual(str(material.GetPath()), overrides.material_root + '/CE15759')
+        finally:
+            overrides.close()
+
+    def test_apply_report_names_unsupported_paths(self):
+        stage = fixture()
+        overrides = ColorOverrides(stage)
+        try:
+            report = overrides.apply({'/World/A': '#E15759', '/Absent': '#E15759'})
+            self.assertEqual(report.colored_paths, ['/World/A'])
+            self.assertEqual(report.unsupported_paths, ['/Absent'])
+            self.assertEqual(report.unsupported, 1)
+        finally:
+            overrides.close()
+
     def test_user_geometry_named_like_the_extension_is_still_discovered(self):
         stage = Usd.Stage.CreateInMemory()
         UsdGeom.Xform.Define(stage, '/__ObjectColorsBuilding')

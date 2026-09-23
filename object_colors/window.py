@@ -39,6 +39,9 @@ class ObjectColorsWindow:
         with ui.VStack(spacing=8, margin=12):
             ui.Label('Object Colors', height=25, style={'font_size': 20})
             ui.Label('Whole stage', height=18, style={'color': 0xFFAAAAAA})
+            if controller.inspection_active:
+                ui.Label('Project View owns the displayed colors. Scheme edits are saved and appear after Exit View.',
+                         word_wrap=True, height=38, style={'color': 0xFF88BBFF})
             with ui.VStack(spacing=8, height=0, enabled=not controller.busy and controller.stage is not None):
                 with ui.HStack(height=24):
                     enabled = ui.CheckBox(width=22)

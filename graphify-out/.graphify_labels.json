@@ -1,10 +1,11 @@
 {
-  "0": "Schemes and scene persistence",
-  "1": "Requirements and verification evidence",
-  "2": "Stage discovery and USD tests",
-  "3": "Extension startup and commands",
-  "4": "Color bindings and regression tests",
+  "0": "Scheme",
+  "1": "Isolated Kit rendering workflow",
+  "2": "discovery.py",
+  "3": "controller.py",
+  "4": "ColorOverrides",
   "5": "Property selection and palette",
-  "6": "Kit rendering verification",
-  "7": "Controller lifecycle and scheduling"
+  "6": "verify_kit.py",
+  "7": "Controller",
+  "8": "InspectionScope"
 }

@@ -18,10 +18,10 @@
     "semantic_hash": "8d0f1f57611c16d09e9d89268c042051"
   },
   "object_colors/controller.py": {
-    "mtime": 1790070651.6744711,
-    "seen": 1790146760.1245682,
-    "ast_hash": "b7fb6a3725d907797eb583e2ec4f11a0",
-    "semantic_hash": "b7fb6a3725d907797eb583e2ec4f11a0"
+    "mtime": 1790172780.3000977,
+    "seen": 1790172815.0200481,
+    "ast_hash": "944de1b5fdfea94efa570f7d22053035",
+    "semantic_hash": ""
   },
   "object_colors/discovery.py": {
     "mtime": 1790147356.1025693,
@@ -30,15 +30,15 @@
     "semantic_hash": ""
   },
   "object_colors/extension.py": {
-    "mtime": 1790000508.9286435,
-    "seen": 1790146760.1245701,
-    "ast_hash": "bf83699bb51eea261811518681ffd58a",
-    "semantic_hash": "bf83699bb51eea261811518681ffd58a"
+    "mtime": 1790172502.0230603,
+    "seen": 1790172755.5552902,
+    "ast_hash": "e7dcfe5133f1f4554427a6d72a013e32",
+    "semantic_hash": ""
   },
   "object_colors/overrides.py": {
-    "mtime": 1790147356.1035743,
-    "seen": 1790147386.0360656,
-    "ast_hash": "5e7cf72dfb57def0bbc1a39af3ee3c2f",
+    "mtime": 1790172826.770091,
+    "seen": 1790172860.9553733,
+    "ast_hash": "6cab0a96ef8936f94d6a7f244fb7302e",
     "semantic_hash": ""
   },
   "object_colors/presets.py": {
@@ -54,10 +54,10 @@
     "semantic_hash": ""
   },
   "object_colors/window.py": {
-    "mtime": 1790074918.7180552,
-    "seen": 1790146760.1245735,
-    "ast_hash": "ac5253d885bf1c3d9c281f5203e9da75",
-    "semantic_hash": "ac5253d885bf1c3d9c281f5203e9da75"
+    "mtime": 1790172502.0245633,
+    "seen": 1790172755.5557568,
+    "ast_hash": "b421feb9d5bbad5b268b2eefa0c259f4",
+    "semantic_hash": ""
   },
   "run-typecheck.ps1": {
     "mtime": 1790001112.5609264,
@@ -102,16 +102,16 @@
     "semantic_hash": "5afe164cc3f091c924c84fd7f26452ac"
   },
   "tests/test_usd.py": {
-    "mtime": 1790082416.0302663,
-    "seen": 1790146760.1245794,
-    "ast_hash": "5859b168f6b0b220e42674063083e591",
-    "semantic_hash": "5859b168f6b0b220e42674063083e591"
+    "mtime": 1790172556.5287442,
+    "seen": 1790172755.557936,
+    "ast_hash": "83f8a6e6bf2fdcb30b76fafb93be6461",
+    "semantic_hash": ""
   },
   "tests/verify_kit.py": {
-    "mtime": 1790082600.512857,
-    "seen": 1790146760.1245801,
-    "ast_hash": "1401966532be827527f27b4e9cc3b519",
-    "semantic_hash": "1401966532be827527f27b4e9cc3b519"
+    "mtime": 1790172871.5322227,
+    "seen": 1790172908.2754254,
+    "ast_hash": "2b7a917f7a43fc32f6ad41c306d1984d",
+    "semantic_hash": ""
   },
   "README.md": {
     "mtime": 1790074912.7667043,

@@ -12,6 +12,12 @@ PURPOSES = ('', 'full', 'preview')
 class ApplyReport:
     colored: int = 0
     issues: list[str] = field(default_factory=list)
+    colored_paths: list[str] = field(default_factory=list)
+    unsupported_paths: list[str] = field(default_factory=list)
+
+    @property
+    def unsupported(self) -> int:
+        return len(self.unsupported_paths)
 
 
 def _linear(hex_color):
@@ -24,6 +30,7 @@ class ColorOverrides:
         self.stage = stage
         self.layer = None
         self.enabled = True
+        self.closed = False
         self.material_root = '/__ObjectColors'
         while stage.GetPrimAtPath(self.material_root):
             self.material_root += '_'
@@ -45,9 +52,13 @@ class ColorOverrides:
                 return done.value
 
     def apply_steps(self, assignments: dict[str, str]):
+        if self.closed:
+            raise RuntimeError('Color overrides are closed.')
         report = ApplyReport()
-        if self.layer:
-            self.stage.MuteLayer(self.layer.identifier)
+        prior = self.layer
+        prior_paths = list(self.stage.GetSessionLayer().subLayerPaths)
+        new_layer = None
+        completed = False
         try:
             new_layer = Sdf.Layer.CreateAnonymous('object-colors.usda')
             work = Usd.Stage.Open(new_layer)
@@ -59,9 +70,11 @@ class ColorOverrides:
                 prim = self.stage.GetPrimAtPath(path)
                 if not prim or prim.IsInstanceProxy() or prim.IsA(UsdGeom.PointInstancer):
                     report.issues.append(f'{path}: cannot override this instance boundary')
+                    report.unsupported_paths.append(path)
                     continue
                 if not any(p.IsA(UsdGeom.Gprim) for p in Usd.PrimRange(prim, Usd.TraverseInstanceProxies())):
                     report.issues.append(f'{path}: no loaded renderable geometry')
+                    report.unsupported_paths.append(path)
                     continue
                 root = '/' + path.strip('/').split('/')[0]
                 checks.append(path)
@@ -100,8 +113,8 @@ class ColorOverrides:
             for root in {k[0] for k in batches}:
                 prim = work.GetPrimAtPath(root)
                 ours = sorted(r.GetName() for r in prim.GetRelationships() if r.GetName().startswith('material:binding:'))
-                prior = self.stage.GetPrimAtPath(root).GetPropertyOrder()
-                prim.SetPropertyOrder(ours + [n for n in prior if n not in ours])
+                prior_order = self.stage.GetPrimAtPath(root).GetPropertyOrder()
+                prim.SetPropertyOrder(ours + [n for n in prior_order if n not in ours])
             self._replace(new_layer)
             # Reject rather than silently accept a stronger session opinion or unsupported binding.
             rejected = set()
@@ -118,8 +131,10 @@ class ColorOverrides:
             for path in checks:
                 if path in rejected:
                     report.issues.append(f'{path}: existing binding prevented coloring')
+                    report.unsupported_paths.append(path)
                 else:
                     report.colored += 1
+                    report.colored_paths.append(path)
             if rejected:
                 with Sdf.ChangeBlock():
                     for (root, color), paths in batches.items():
@@ -129,9 +144,21 @@ class ColorOverrides:
                         prim = work.GetPrimAtPath(path)
                         for purpose in PURPOSES:
                             prim.RemoveProperty('material:binding' + (':' + purpose if purpose else ''))
+            completed = True
             return report
         finally:
-            self.set_enabled(self.enabled)
+            if not self.closed:
+                if not completed and new_layer is not None and self.layer is new_layer:
+                    assert new_layer is not None
+                    session = self.stage.GetSessionLayer()
+                    paths = [p for p in session.subLayerPaths if p != new_layer.identifier
+                             and (prior is None or p != prior.identifier)]
+                    if prior is not None:
+                        index = prior_paths.index(prior.identifier)
+                        paths.insert(min(index, len(paths)), prior.identifier)
+                    session.subLayerPaths = paths
+                    self.layer = prior
+                self.set_enabled(self.enabled)
 
     def _replace(self, layer):
         session = self.stage.GetSessionLayer()
@@ -143,6 +170,7 @@ class ColorOverrides:
             self.stage.UnmuteLayer(prior.identifier)
 
     def close(self):
+        self.closed = True
         if self.layer:
             session = self.stage.GetSessionLayer()
             session.subLayerPaths = [p for p in session.subLayerPaths if p != self.layer.identifier]
